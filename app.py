@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import time
-import sqlite3
 import json as _json
 import os
 from pathlib import Path

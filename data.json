@@ -2,7 +2,7 @@
   "equipos": [
     {
       "id": 1,
-      "nombre": "Dav - Jua",
+      "nombre": "David - Juan",
       "jugador1": "David",
       "jugador2": "Juan",
       "puntos_total": 3,
@@ -12,7 +12,7 @@
     },
     {
       "id": 2,
-      "nombre": "Ari - Agus",
+      "nombre": "Ariadna - Agustina",
       "jugador1": "Agustina",
       "jugador2": "Ari",
       "puntos_total": 6,
@@ -22,7 +22,7 @@
     },
     {
       "id": 3,
-      "nombre": "Jos - She",
+      "nombre": "Jose - Sheriff",
       "jugador1": "Sheriff",
       "jugador2": "Jose",
       "puntos_total": 4,
@@ -32,7 +32,7 @@
     },
     {
       "id": 4,
-      "nombre": "Carl - Dam",
+      "nombre": "Carlos - Damaryd",
       "jugador1": "Carlos",
       "jugador2": "Damaryd",
       "puntos_total": 10,
@@ -42,7 +42,7 @@
     },
     {
       "id": 5,
-      "nombre": "Reg - Ign",
+      "nombre": "Regino - Ignacio",
       "jugador1": "Regino",
       "jugador2": "Ignacio",
       "puntos_total": 0,
@@ -52,7 +52,7 @@
     },
     {
       "id": 6,
-      "nombre": "Enm - Dan",
+      "nombre": "Enmanuel - Daniel",
       "jugador1": "Enmanuel",
       "jugador2": "Daniel",
       "puntos_total": 0,
@@ -62,7 +62,7 @@
     },
     {
       "id": 7,
-      "nombre": "Sar Pl - Han",
+      "nombre": "Sarai Playita - Hannah",
       "jugador1": "Sarai Playita",
       "jugador2": "Hannah",
       "puntos_total": 0,
@@ -72,7 +72,7 @@
     },
     {
       "id": 8,
-      "nombre": "Ayb - Ang",
+      "nombre": "Aybersson - Angelerick",
       "jugador1": "Aybersson",
       "jugador2": "Angelerick",
       "puntos_total": 8,
@@ -82,7 +82,7 @@
     },
     {
       "id": 9,
-      "nombre": "Jor - Die",
+      "nombre": "Jorgelis - Diego",
       "jugador1": "Jorgelis",
       "jugador2": "Diego",
       "puntos_total": 0,
@@ -92,7 +92,7 @@
     },
     {
       "id": 10,
-      "nombre": "Mar - Eric",
+      "nombre": "Mario - Erick",
       "jugador1": "Mario",
       "jugador2": "Erick",
       "puntos_total": 0,
@@ -102,7 +102,7 @@
     },
     {
       "id": 11,
-      "nombre": "Sar - Ang",
+      "nombre": "Sarai - Angelina",
       "jugador1": "Sarai",
       "jugador2": "Angelina",
       "puntos_total": 0,
@@ -112,7 +112,7 @@
     },
     {
       "id": 12,
-      "nombre": "Isaa - Manuel",
+      "nombre": "Isaac - Manuel",
       "jugador1": "Isaac",
       "jugador2": "Manuel",
       "puntos_total": 3,
