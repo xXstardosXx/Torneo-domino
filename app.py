@@ -10,7 +10,7 @@ from streamlit import errors as _st_errors
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Torneo de Dominó Pro",
+    page_title="Torneo de Dominó",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -67,7 +67,6 @@ st.markdown("""
 
 # Archivo de base de datos SQLite
 DATA_DIR = Path(__file__).parent
-DB_FILE = DATA_DIR / "torneo.db"
 
 
 def safe_get_secret(key, default=None):
@@ -647,7 +646,7 @@ def clear_database():
         return False
 
 # Header principal
-st.markdown('<div class="main-header">🏆 TORNEO DE DOMINÓ PRO</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">🏆 TORNEO DE DOMINÓ 2025C</div>', unsafe_allow_html=True)
 
 
 def centered_heading(text, level=3):
@@ -1025,4 +1024,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("*Sistema de Torneo de Dominó Pro • Desarrollado con Streamlit*")
+st.markdown("*Torneo de Domino Uru 2025C •*")
