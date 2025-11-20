@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime
 import time
 import sqlite3
+import json as _json
 import os
 from pathlib import Path
 from streamlit import errors as _st_errors
@@ -106,142 +107,178 @@ def maybe_rerun():
 
 
 def get_conn():
-    # Si existe DATABASE_URL en env o en secrets, conectar a Postgres
-    db_url = safe_get_secret("DATABASE_URL", None)
-    if db_url:
-        try:
-            import psycopg2
-            from psycopg2.extras import RealDictCursor
-            raw_conn = psycopg2.connect(db_url, sslmode='require')
-
-            class PGConnWrapper:
-                def __init__(self, conn):
-                    self._conn = conn
-
-                def cursor(self):
-                    return self._conn.cursor(cursor_factory=RealDictCursor)
-
-                def commit(self):
-                    return self._conn.commit()
-
-                def rollback(self):
-                    return self._conn.rollback()
-
-                def close(self):
-                    return self._conn.close()
-
-            return PGConnWrapper(raw_conn)
-        except Exception as e:
-            # Fallback a sqlite si falla la conexión a Postgres
-            st.warning(f"Fallo al conectar a Postgres, usando SQLite. Error: {e}")
-
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    # Esta aplicación ahora puede usar un almacenamiento JSON local (`data.json`)
+    # Si hay una variable `DATABASE_URL` se podría usar Postgres, pero en esta
+    # versión preferimos JSON en disco para sincronizar vía GitHub (actualizaciones
+    # por push). Conservamos la función por compatibilidad, pero no abrimos
+    # conexiones DB.
+    return None
 
 
 def init_db():
+    # Inicializar archivo JSON de datos si no existe
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = get_conn()
-    cur = conn.cursor()
-    # Eliminar tabla config si existe (limpiar cualquier contraseña almacenada previamente)
-    try:
-        cur.execute("DROP TABLE IF EXISTS config")
-    except Exception:
-        pass
-    # Tabla equipos (parejas / "cruz")
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS equipos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT UNIQUE NOT NULL,
-        jugador1 TEXT NOT NULL,
-        jugador2 TEXT NOT NULL,
-        puntos_total INTEGER DEFAULT 0,
-        partidos_jugados INTEGER DEFAULT 0,
-        partidos_ganados INTEGER DEFAULT 0,
-        partidos_perdidos INTEGER DEFAULT 0
-    )
-    """)
-    # Tabla partidos
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS partidos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ronda INTEGER,
-        equipo1_id INTEGER,
-        equipo2_id INTEGER,
-        puntos_e1 INTEGER,
-        puntos_e2 INTEGER,
-        rounds_json TEXT,
-        ganador_id INTEGER,
-        match_pts_e1 INTEGER DEFAULT 0,
-        match_pts_e2 INTEGER DEFAULT 0,
-        fecha TEXT,
-        FOREIGN KEY(equipo1_id) REFERENCES equipos(id),
-        FOREIGN KEY(equipo2_id) REFERENCES equipos(id),
-        FOREIGN KEY(ganador_id) REFERENCES equipos(id)
-    )
-    """)
-    # Asegurar columnas legacy/alter
-    try:
-        cur.execute("ALTER TABLE partidos ADD COLUMN match_pts_e1 INTEGER DEFAULT 0")
-    except Exception:
-        pass
-    try:
-        cur.execute("ALTER TABLE partidos ADD COLUMN match_pts_e2 INTEGER DEFAULT 0")
-    except Exception:
-        pass
-    # no se guardan configuraciones en tabla para uso personal
-    conn.commit()
-    conn.close()
+    data_file = DATA_DIR / "data.json"
+    if not data_file.exists():
+        base = {"equipos": [], "partidos": []}
+        try:
+            with open(data_file, "w", encoding="utf-8") as f:
+                _json.dump(base, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            st.warning(f"No se pudo crear data.json: {e}")
 
 
 # No se usa almacenamiento de contraseña; uso contraseña fija en código para uso personal
 
 
 def load_data():
-    """Carga jugadores y partidos desde la base de datos."""
+    """Carga `equipos` y `partidos` desde `data.json` y devuelve listas en el mismo
+    formato que antes para minimizar cambios en la UI.
+
+    Aplicamos una recalculación segura de estadísticas en los datos en disco
+    para que los cambios de reglas (puntos solo al ganador por rondas)
+    se apliquen también a partidos ya existentes.
+    """
     init_db()
-    conn = get_conn()
-    cur = conn.cursor()
+    data_file = DATA_DIR / "data.json"
     equipos = []
-    partidos = []
+    partidos_out = []
     try:
-        cur.execute("SELECT id, nombre, jugador1, jugador2, puntos_total, partidos_jugados, partidos_ganados, partidos_perdidos FROM equipos")
-        equipos = [dict(row) for row in cur.fetchall()]
-        cur.execute("""
-        SELECT p.id, p.ronda, e1.nombre AS equipo1, e2.nombre AS equipo2,
-               p.puntos_e1 AS puntos_j1, p.puntos_e2 AS puntos_j2,
-               p.rounds_json AS rounds_json, p.match_pts_e1 AS match_pts_e1, p.match_pts_e2 AS match_pts_e2,
-               COALESCE(e3.nombre, 'Empate') AS ganador, p.fecha
-        FROM partidos p
-        LEFT JOIN equipos e1 ON p.equipo1_id = e1.id
-        LEFT JOIN equipos e2 ON p.equipo2_id = e2.id
-        LEFT JOIN equipos e3 ON p.ganador_id = e3.id
-        ORDER BY p.id ASC
-        """)
-        partidos = [dict(row) for row in cur.fetchall()]
+        with open(data_file, "r", encoding="utf-8") as f:
+            store = _json.load(f)
     except Exception as e:
-        st.warning(f"No se pudieron cargar los datos desde la base: {e}")
-    finally:
-        conn.close()
-    return equipos, partidos
+        st.warning(f"No se pudo leer data.json: {e}")
+        store = {"equipos": [], "partidos": []}
+
+    # Recalcular y corregir estadísticas en el store para aplicar la nueva regla
+    try:
+        # inicializar
+        for e in store.get('equipos', []):
+            e['puntos_total'] = 0
+            e['partidos_jugados'] = 0
+            e['partidos_ganados'] = 0
+            e['partidos_perdidos'] = 0
+
+        equipos_map = {e['id']: e for e in store.get('equipos', [])}
+        for p in store.get('partidos', []):
+            e1 = equipos_map.get(p.get('equipo1_id'))
+            e2 = equipos_map.get(p.get('equipo2_id'))
+            if not e1 or not e2:
+                continue
+            # contabilizar jugados
+            e1['partidos_jugados'] = e1.get('partidos_jugados', 0) + 1
+            e2['partidos_jugados'] = e2.get('partidos_jugados', 0) + 1
+            # puntos: SOLO los bonos por rondas al ganador del partido
+            if p.get('ganador_id') == e1.get('id'):
+                e1['puntos_total'] = e1.get('puntos_total', 0) + (p.get('round_bonus_e1') or 0)
+                equipos_map[p.get('ganador_id')]['partidos_ganados'] = equipos_map[p.get('ganador_id')].get('partidos_ganados', 0) + 1
+                loser = p.get('equipo2_id') if p.get('ganador_id') == p.get('equipo1_id') else p.get('equipo1_id')
+                equipos_map[loser]['partidos_perdidos'] = equipos_map[loser].get('partidos_perdidos', 0) + 1
+            elif p.get('ganador_id') == e2.get('id'):
+                e2['puntos_total'] = e2.get('puntos_total', 0) + (p.get('round_bonus_e2') or 0)
+                equipos_map[p.get('ganador_id')]['partidos_ganados'] = equipos_map[p.get('ganador_id')].get('partidos_ganados', 0) + 1
+                loser = p.get('equipo2_id') if p.get('ganador_id') == p.get('equipo1_id') else p.get('equipo1_id')
+                equipos_map[loser]['partidos_perdidos'] = equipos_map[loser].get('partidos_perdidos', 0) + 1
+
+        # persistir correcciones
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(store, f, ensure_ascii=False, indent=2)
+    except Exception:
+        # si algo falla, no rompemos la carga; devolvemos lo que tengamos
+        pass
+
+    # Equipos: ya contienen los campos necesarios
+    equipos = store.get("equipos", [])
+
+    # Partidos: convertir ids a nombres en la estructura esperada por la UI
+    equipos_by_id = {e['id']: e['nombre'] for e in equipos}
+    for p in store.get("partidos", []):
+        partido = {
+            'id': p.get('id'),
+            'ronda': p.get('ronda'),
+            'equipo1': equipos_by_id.get(p.get('equipo1_id')),
+            'equipo2': equipos_by_id.get(p.get('equipo2_id')),
+            'puntos_j1': p.get('puntos_e1'),
+            'puntos_j2': p.get('puntos_e2'),
+            'rounds_json': p.get('rounds_json'),
+            'match_pts_e1': p.get('match_pts_e1'),
+            'match_pts_e2': p.get('match_pts_e2'),
+            'ganador': equipos_by_id.get(p.get('ganador_id')) if p.get('ganador_id') is not None else 'Empate',
+            'fecha': p.get('fecha')
+        }
+        partidos_out.append(partido)
+
+    return equipos, partidos_out
 
 
 def add_team_db(nombre, jugador1, jugador2):
-    conn = get_conn()
-    cur = conn.cursor()
+    # Persistencia basada en JSON: añadir equipo a data.json
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    data_file = DATA_DIR / "data.json"
     try:
-        cur.execute(
-            "INSERT INTO equipos (nombre, jugador1, jugador2, puntos_total, partidos_jugados, partidos_ganados, partidos_perdidos) VALUES (?,?,?,?,0,0,0)",
-            (nombre, jugador1, jugador2, 0)
-        )
-        conn.commit()
-        new_id = cur.lastrowid
-    except sqlite3.IntegrityError:
-        new_id = None
-    finally:
-        conn.close()
-    return new_id
+        with open(data_file, "r", encoding="utf-8") as f:
+            store = _json.load(f)
+    except Exception:
+        store = {"equipos": [], "partidos": []}
+
+    # comprobar duplicado por nombre
+    if any(e.get('nombre') == nombre for e in store.get('equipos', [])):
+        return None
+
+    next_id = 1
+    ids = [e.get('id', 0) for e in store.get('equipos', [])]
+    if ids:
+        next_id = max(ids) + 1
+
+    equipo = {
+        'id': next_id,
+        'nombre': nombre,
+        'jugador1': jugador1,
+        'jugador2': jugador2,
+        'puntos_total': 0,
+        'partidos_jugados': 0,
+        'partidos_ganados': 0,
+        'partidos_perdidos': 0
+    }
+    store.setdefault('equipos', []).append(equipo)
+    try:
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(store, f, ensure_ascii=False, indent=2)
+        return next_id
+    except Exception as e:
+        st.warning(f"No se pudo guardar el equipo: {e}")
+        return None
+
+
+def rename_team_db(equipo_id, nuevo_nombre):
+    """Renombra un equipo por su id, evitando duplicados de nombre."""
+    data_file = DATA_DIR / "data.json"
+    try:
+        with open(data_file, "r", encoding="utf-8") as f:
+            store = _json.load(f)
+    except Exception:
+        st.warning("No se pudo leer data.json")
+        return False
+
+    equipos = store.get('equipos', [])
+    # verificar si existe otro equipo con mismo nombre
+    if any(e.get('nombre') == nuevo_nombre and e.get('id') != equipo_id for e in equipos):
+        st.error("Ya existe un equipo con ese nombre.")
+        return False
+
+    equipo = next((e for e in equipos if e.get('id') == equipo_id), None)
+    if not equipo:
+        st.error("Equipo no encontrado")
+        return False
+
+    equipo['nombre'] = nuevo_nombre
+    try:
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(store, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        st.warning(f"No se pudo renombrar el equipo: {e}")
+        return False
 
 
 def add_partido_db(ronda, equipo1_name, equipo2_name, rounds_list, fecha):
@@ -249,104 +286,150 @@ def add_partido_db(ronda, equipo1_name, equipo2_name, rounds_list, fecha):
     `rounds_list` es una lista de dicts: [{'puntos_e1': int, 'puntos_e2': int}, ...]
     """
     import json as _json
-    conn = get_conn()
-    cur = conn.cursor()
+    # Almacenar partido en data.json
+    data_file = DATA_DIR / "data.json"
     try:
-        # Obtener ids de equipos
-        cur.execute("SELECT id FROM equipos WHERE nombre = ?", (equipo1_name,))
-        r1 = cur.fetchone()
-        cur.execute("SELECT id FROM equipos WHERE nombre = ?", (equipo2_name,))
-        r2 = cur.fetchone()
-        if not r1 or not r2:
-            st.warning("Uno de los equipos no existe en la base de datos")
-            return None
-        equipo1_id = r1['id']
-        equipo2_id = r2['id']
+        with open(data_file, "r", encoding="utf-8") as f:
+            store = _json.load(f)
+    except Exception:
+        st.warning("No se encontró data.json o está corrupto")
+        return None
 
-        # Calcular totales y sets ganados
-        total_e1 = 0
-        total_e2 = 0
-        sets_e1 = 0
-        sets_e2 = 0
-        rounds_serializable = []
-        for rd in rounds_list:
-            pe1 = int(rd.get('puntos_e1', 0))
-            pe2 = int(rd.get('puntos_e2', 0))
-            total_e1 += pe1
-            total_e2 += pe2
-            # determinar ganador de la ronda: ahora se considera ganada solo si es exactamente 100
-            if pe1 == 100 or pe2 == 100:
-                if pe1 == 100 and pe2 != 100:
-                    sets_e1 += 1
-                    winner = equipo1_id
-                elif pe2 == 100 and pe1 != 100:
-                    sets_e2 += 1
-                    winner = equipo2_id
-                else:
-                    # ambos 100 -> empate de ronda
-                    winner = None
-            else:
-                # si ninguno llegó a 100, decidir por quien tiene más puntos
-                if pe1 > pe2:
-                    sets_e1 += 1
-                    winner = equipo1_id
-                elif pe2 > pe1:
-                    sets_e2 += 1
-                    winner = equipo2_id
-                else:
-                    winner = None
-            rounds_serializable.append({'puntos_e1': pe1, 'puntos_e2': pe2, 'winner_id': winner})
+    # buscar ids por nombre
+    equipos = store.get('equipos', [])
+    e1 = next((e for e in equipos if e.get('nombre') == equipo1_name), None)
+    e2 = next((e for e in equipos if e.get('nombre') == equipo2_name), None)
+    if not e1 or not e2:
+        st.warning("Uno de los equipos no existe en la base de datos")
+        return None
+    equipo1_id = e1['id']
+    equipo2_id = e2['id']
 
-        # Determinar ganador del partido (mejor de 3 -> primero a 2 sets)
-        if sets_e1 >= 2:
-            ganador_id = equipo1_id
-        elif sets_e2 >= 2:
-            ganador_id = equipo2_id
-        else:
-            ganador_id = None
-
-        rounds_json = _json.dumps(rounds_serializable, ensure_ascii=False)
-
-        # Evitar que se juegue dos veces el mismo enfrentamiento (independientemente del orden)
-        cur.execute("SELECT id FROM partidos WHERE (equipo1_id = ? AND equipo2_id = ?) OR (equipo1_id = ? AND equipo2_id = ?)", (equipo1_id, equipo2_id, equipo2_id, equipo1_id))
-        existing = cur.fetchone()
-        if existing:
+    # evitar duplicados (independientemente del orden)
+    for p in store.get('partidos', []):
+        if {p.get('equipo1_id'), p.get('equipo2_id')} == {equipo1_id, equipo2_id}:
             st.warning("❌ Ya existe un partido entre estos equipos. No se permiten duplicados.")
             return None
 
-        # Determinar puntos de liga por partido: ganador 3, empate 1 cada uno, perdedor 0
-        if ganador_id == equipo1_id:
-            match_pts_e1 = 3
-            match_pts_e2 = 0
-        elif ganador_id == equipo2_id:
-            match_pts_e1 = 0
-            match_pts_e2 = 3
+    # calcular totales y sets
+    total_e1 = 0
+    total_e2 = 0
+    sets_e1 = 0
+    sets_e2 = 0
+    rounds_serializable = []
+    # bonos por ronda: si la diferencia es >=35 -> +2 puntos, si es menor -> +1 punto (solo al ganador de la ronda)
+    round_bonus_e1 = 0
+    round_bonus_e2 = 0
+    for rd in rounds_list:
+        pe1 = int(rd.get('puntos_e1', 0))
+        pe2 = int(rd.get('puntos_e2', 0))
+        total_e1 += pe1
+        total_e2 += pe2
+        if pe1 == 100 or pe2 == 100:
+            if pe1 == 100 and pe2 != 100:
+                sets_e1 += 1
+                winner = equipo1_id
+            elif pe2 == 100 and pe1 != 100:
+                sets_e2 += 1
+                winner = equipo2_id
+            else:
+                winner = None
         else:
-            match_pts_e1 = 1
-            match_pts_e2 = 1
+            if pe1 > pe2:
+                sets_e1 += 1
+                winner = equipo1_id
+            elif pe2 > pe1:
+                sets_e2 += 1
+                winner = equipo2_id
+            else:
+                winner = None
+        # calcular bono por la ronda
+        if winner == equipo1_id:
+            diff = abs(pe1 - pe2)
+            round_bonus_e1 += 2 if diff >= 35 else 1
+        elif winner == equipo2_id:
+            diff = abs(pe1 - pe2)
+            round_bonus_e2 += 2 if diff >= 35 else 1
 
-        cur.execute(
-            "INSERT INTO partidos (ronda, equipo1_id, equipo2_id, puntos_e1, puntos_e2, rounds_json, ganador_id, match_pts_e1, match_pts_e2, fecha) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (ronda, equipo1_id, equipo2_id, total_e1, total_e2, rounds_json, ganador_id, match_pts_e1, match_pts_e2, fecha)
-        )
+        rounds_serializable.append({'puntos_e1': pe1, 'puntos_e2': pe2, 'winner_id': winner})
 
-        # Actualizar estadísticas de equipos (puntos de liga)
-        cur.execute("UPDATE equipos SET partidos_jugados = partidos_jugados + 1, puntos_total = puntos_total + ? WHERE id = ?", (match_pts_e1, equipo1_id))
-        cur.execute("UPDATE equipos SET partidos_jugados = partidos_jugados + 1, puntos_total = puntos_total + ? WHERE id = ?", (match_pts_e2, equipo2_id))
-        if ganador_id is not None:
-            cur.execute("UPDATE equipos SET partidos_ganados = partidos_ganados + 1 WHERE id = ?", (ganador_id,))
-            loser_id = equipo2_id if ganador_id == equipo1_id else equipo1_id
-            cur.execute("UPDATE equipos SET partidos_perdidos = partidos_perdidos + 1 WHERE id = ?", (loser_id,))
+    # Determinar ganador: preferir al que ganó 2 sets.
+    # Si nadie alcanzó 2 sets (caso excepcional), desempatar por puntos totales.
+    if sets_e1 >= 2:
+        ganador_id = equipo1_id
+    elif sets_e2 >= 2:
+        ganador_id = equipo2_id
+    else:
+        if total_e1 > total_e2:
+            ganador_id = equipo1_id
+        elif total_e2 > total_e1:
+            ganador_id = equipo2_id
+        else:
+            # Empate exacto en totales (muy raro): asignar ganador por determinismo al equipo1
+            ganador_id = equipo1_id
 
-        conn.commit()
-        new_id = cur.lastrowid
+    rounds_json = _json.dumps(rounds_serializable, ensure_ascii=False)
+
+    # En esta regla los equipos NO reciben puntos de partido (3/0)
+    # Los puntos se otorgan solo como bonos por rondas y SOLO al ganador del partido.
+    match_pts_e1, match_pts_e2 = 0, 0
+
+    # generar id
+    ids = [p.get('id', 0) for p in store.get('partidos', [])]
+    next_id = max(ids) + 1 if ids else 1
+
+    partido = {
+        'id': next_id,
+        'ronda': ronda,
+        'equipo1_id': equipo1_id,
+        'equipo2_id': equipo2_id,
+        'puntos_e1': total_e1,
+        'puntos_e2': total_e2,
+        'rounds_json': rounds_json,
+        'ganador_id': ganador_id,
+        'match_pts_e1': match_pts_e1,
+        'match_pts_e2': match_pts_e2,
+        'round_bonus_e1': round_bonus_e1,
+        'round_bonus_e2': round_bonus_e2,
+        'fecha': fecha
+    }
+
+    store.setdefault('partidos', []).append(partido)
+
+    # recalcular estadísticas globales desde partidos
+    try:
+        # inicializar
+        for e in store.get('equipos', []):
+            e['puntos_total'] = 0
+            e['partidos_jugados'] = 0
+            e['partidos_ganados'] = 0
+            e['partidos_perdidos'] = 0
+
+        equipos_map = {e['id']: e for e in store.get('equipos', [])}
+        for p in store.get('partidos', []):
+            e1 = equipos_map.get(p.get('equipo1_id'))
+            e2 = equipos_map.get(p.get('equipo2_id'))
+            if not e1 or not e2:
+                continue
+            # contabilizar jugados
+            e1['partidos_jugados'] = e1.get('partidos_jugados', 0) + 1
+            e2['partidos_jugados'] = e2.get('partidos_jugados', 0) + 1
+            # puntos: ahora solo se otorgan los bonos por rondas AL GANADOR del partido
+            if p.get('ganador_id') == e1.get('id'):
+                e1['puntos_total'] = e1.get('puntos_total', 0) + (p.get('round_bonus_e1') or 0)
+            if p.get('ganador_id') == e2.get('id'):
+                e2['puntos_total'] = e2.get('puntos_total', 0) + (p.get('round_bonus_e2') or 0)
+            if p.get('ganador_id') is not None:
+                equipos_map[p.get('ganador_id')]['partidos_ganados'] = equipos_map[p.get('ganador_id')].get('partidos_ganados', 0) + 1
+                loser = p.get('equipo2_id') if p.get('ganador_id') == p.get('equipo1_id') else p.get('equipo1_id')
+                equipos_map[loser]['partidos_perdidos'] = equipos_map[loser].get('partidos_perdidos', 0) + 1
+
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(store, f, ensure_ascii=False, indent=2)
+        return next_id
     except Exception as e:
-        conn.rollback()
-        st.warning(f"Error guardando partido en DB: {e}")
-        new_id = None
-    finally:
-        conn.close()
-    return new_id
+        st.warning(f"Error guardando partido en JSON: {e}")
+        return None
 
 
 # Inicializar session state (cargar persistencia si existe)
@@ -386,161 +469,183 @@ def agregar_partido(equipo1_name, equipo2_name, rounds_list):
 
 
 def update_partido_db(partido_id, rounds_list):
-    """Actualiza un partido existente (recalcula sets, puntos y actualiza estadísticas de equipos)."""
-    import json as _json
-    conn = get_conn()
-    cur = conn.cursor()
+    # Actualizar partido en data.json: sobrescribimos rounds_json y recalculamos estadísticas
+    data_file = DATA_DIR / "data.json"
     try:
-        cur.execute("SELECT * FROM partidos WHERE id = ?", (partido_id,))
-        row = cur.fetchone()
-        if not row:
-            st.error("Partido no encontrado")
-            return False
+        with open(data_file, "r", encoding="utf-8") as f:
+            store = _json.load(f)
+    except Exception:
+        st.warning("No se pudo leer data.json")
+        return False
 
-        equipo1_id = row['equipo1_id']
-        equipo2_id = row['equipo2_id']
-        old_match_pts_e1 = row['match_pts_e1'] or 0
-        old_match_pts_e2 = row['match_pts_e2'] or 0
-        old_ganador = row['ganador_id']
+    partido = next((p for p in store.get('partidos', []) if p.get('id') == partido_id), None)
+    if not partido:
+        st.error("Partido no encontrado")
+        return False
 
-        # Calcular nuevos valores
-        total_e1 = 0
-        total_e2 = 0
-        sets_e1 = 0
-        sets_e2 = 0
-        rounds_serializable = []
-        for rd in rounds_list:
-            pe1 = int(rd.get('puntos_e1', 0))
-            pe2 = int(rd.get('puntos_e2', 0))
-            total_e1 += pe1
-            total_e2 += pe2
-            # Validación: ronda ganada solo si es exactamente 100
-            if pe1 == 100 or pe2 == 100:
-                if pe1 == 100 and pe2 != 100:
-                    sets_e1 += 1
-                    winner = equipo1_id
-                elif pe2 == 100 and pe1 != 100:
-                    sets_e2 += 1
-                    winner = equipo2_id
-                else:
-                    winner = None
+    # reconstruir rounds y campos a partir de rounds_list
+    total_e1 = 0
+    total_e2 = 0
+    sets_e1 = 0
+    sets_e2 = 0
+    rounds_serializable = []
+    round_bonus_e1 = 0
+    round_bonus_e2 = 0
+    for rd in rounds_list:
+        pe1 = int(rd.get('puntos_e1', 0))
+        pe2 = int(rd.get('puntos_e2', 0))
+        total_e1 += pe1
+        total_e2 += pe2
+        if pe1 == 100 or pe2 == 100:
+            if pe1 == 100 and pe2 != 100:
+                sets_e1 += 1
+                winner = partido.get('equipo1_id')
+            elif pe2 == 100 and pe1 != 100:
+                sets_e2 += 1
+                winner = partido.get('equipo2_id')
             else:
-                if pe1 > pe2:
-                    sets_e1 += 1
-                    winner = equipo1_id
-                elif pe2 > pe1:
-                    sets_e2 += 1
-                    winner = equipo2_id
-                else:
-                    winner = None
-            rounds_serializable.append({'puntos_e1': pe1, 'puntos_e2': pe2, 'winner_id': winner})
-
-        if sets_e1 >= 2:
-            new_ganador = equipo1_id
-        elif sets_e2 >= 2:
-            new_ganador = equipo2_id
+                winner = None
         else:
-            new_ganador = None
+            if pe1 > pe2:
+                sets_e1 += 1
+                winner = partido.get('equipo1_id')
+            elif pe2 > pe1:
+                sets_e2 += 1
+                winner = partido.get('equipo2_id')
+            else:
+                winner = None
+        # calcular bono por la ronda
+        if winner == partido.get('equipo1_id'):
+            diff = abs(pe1 - pe2)
+            round_bonus_e1 += 2 if diff >= 35 else 1
+        elif winner == partido.get('equipo2_id'):
+            diff = abs(pe1 - pe2)
+            round_bonus_e2 += 2 if diff >= 35 else 1
 
-        if new_ganador == equipo1_id:
-            new_match_pts_e1, new_match_pts_e2 = 3, 0
-        elif new_ganador == equipo2_id:
-            new_match_pts_e1, new_match_pts_e2 = 0, 3
+        rounds_serializable.append({'puntos_e1': pe1, 'puntos_e2': pe2, 'winner_id': winner})
+
+    # Determinar ganador tras editar: preferir quien llegó a 2 sets.
+    if sets_e1 >= 2:
+        new_ganador = partido.get('equipo1_id')
+    elif sets_e2 >= 2:
+        new_ganador = partido.get('equipo2_id')
+    else:
+        # desempatar por totales
+        if total_e1 > total_e2:
+            new_ganador = partido.get('equipo1_id')
+        elif total_e2 > total_e1:
+            new_ganador = partido.get('equipo2_id')
         else:
-            new_match_pts_e1, new_match_pts_e2 = 1, 1
+            new_ganador = partido.get('equipo1_id')
 
-        rounds_json = _json.dumps(rounds_serializable, ensure_ascii=False)
+    # No otorgamos puntos de partido; los puntos son solo los bonos por rondas
+    new_match_pts_e1, new_match_pts_e2 = 0, 0
 
-        # Ajustar estadísticas de equipos: sustituir puntos de liga antiguos por nuevos
-        # Restar antiguos match pts
-        cur.execute("UPDATE equipos SET puntos_total = puntos_total - ? WHERE id = ?", (old_match_pts_e1, equipo1_id))
-        cur.execute("UPDATE equipos SET puntos_total = puntos_total - ? WHERE id = ?", (old_match_pts_e2, equipo2_id))
-        # Aplicar nuevos match pts
-        cur.execute("UPDATE equipos SET puntos_total = puntos_total + ? WHERE id = ?", (new_match_pts_e1, equipo1_id))
-        cur.execute("UPDATE equipos SET puntos_total = puntos_total + ? WHERE id = ?", (new_match_pts_e2, equipo2_id))
+    partido['puntos_e1'] = total_e1
+    partido['puntos_e2'] = total_e2
+    partido['rounds_json'] = _json.dumps(rounds_serializable, ensure_ascii=False)
+    partido['ganador_id'] = new_ganador
+    partido['match_pts_e1'] = new_match_pts_e1
+    partido['match_pts_e2'] = new_match_pts_e2
+    partido['round_bonus_e1'] = round_bonus_e1
+    partido['round_bonus_e2'] = round_bonus_e2
+    partido['fecha'] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-        # Ajustar ganados/perdidos si cambió el ganador
-        if old_ganador != new_ganador:
-            # Decrementar conteos del ganador antiguo
-            if old_ganador is not None:
-                cur.execute("UPDATE equipos SET partidos_ganados = partidos_ganados - 1 WHERE id = ?", (old_ganador,))
-                loser_old = equipo2_id if old_ganador == equipo1_id else equipo1_id
-                cur.execute("UPDATE equipos SET partidos_perdidos = partidos_perdidos - 1 WHERE id = ?", (loser_old,))
-            # Incrementar conteos del nuevo ganador
-            if new_ganador is not None:
-                cur.execute("UPDATE equipos SET partidos_ganados = partidos_ganados + 1 WHERE id = ?", (new_ganador,))
-                loser_new = equipo2_id if new_ganador == equipo1_id else equipo1_id
-                cur.execute("UPDATE equipos SET partidos_perdidos = partidos_perdidos + 1 WHERE id = ?", (loser_new,))
+    # recalcular estadísticas globales
+    try:
+        for e in store.get('equipos', []):
+            e['puntos_total'] = 0
+            e['partidos_jugados'] = 0
+            e['partidos_ganados'] = 0
+            e['partidos_perdidos'] = 0
+        equipos_map = {e['id']: e for e in store.get('equipos', [])}
+        for p in store.get('partidos', []):
+            e1 = equipos_map.get(p.get('equipo1_id'))
+            e2 = equipos_map.get(p.get('equipo2_id'))
+            if not e1 or not e2:
+                continue
+            e1['partidos_jugados'] = e1.get('partidos_jugados', 0) + 1
+            e2['partidos_jugados'] = e2.get('partidos_jugados', 0) + 1
+            # sumar SOLO los bonos por rondas al ganador del partido
+            if p.get('ganador_id') == e1.get('id'):
+                e1['puntos_total'] = e1.get('puntos_total', 0) + (p.get('round_bonus_e1') or 0)
+            if p.get('ganador_id') == e2.get('id'):
+                e2['puntos_total'] = e2.get('puntos_total', 0) + (p.get('round_bonus_e2') or 0)
+            if p.get('ganador_id') is not None:
+                equipos_map[p.get('ganador_id')]['partidos_ganados'] = equipos_map[p.get('ganador_id')].get('partidos_ganados', 0) + 1
+                loser = p.get('equipo2_id') if p.get('ganador_id') == p.get('equipo1_id') else p.get('equipo1_id')
+                equipos_map[loser]['partidos_perdidos'] = equipos_map[loser].get('partidos_perdidos', 0) + 1
 
-        # Actualizar la fila de partido
-        cur.execute(
-            "UPDATE partidos SET puntos_e1 = ?, puntos_e2 = ?, rounds_json = ?, ganador_id = ?, match_pts_e1 = ?, match_pts_e2 = ?, fecha = ? WHERE id = ?",
-            (total_e1, total_e2, rounds_json, new_ganador, new_match_pts_e1, new_match_pts_e2, datetime.now().strftime("%Y-%m-%d %H:%M"), partido_id)
-        )
-
-        conn.commit()
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(store, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        conn.rollback()
-        st.warning(f"Error actualizando partido: {e}")
+        st.warning(f"Error actualizando partido en JSON: {e}")
         return False
-    finally:
-        conn.close()
 
 
 def delete_partido_db(partido_id):
     """Elimina un partido y ajusta las estadísticas de los equipos afectados."""
-    conn = get_conn()
-    cur = conn.cursor()
+    data_file = DATA_DIR / "data.json"
     try:
-        cur.execute("SELECT * FROM partidos WHERE id = ?", (partido_id,))
-        row = cur.fetchone()
-        if not row:
-            st.error("Partido no encontrado")
-            return False
-        equipo1_id = row['equipo1_id']
-        equipo2_id = row['equipo2_id']
-        match_pts_e1 = row['match_pts_e1'] or 0
-        match_pts_e2 = row['match_pts_e2'] or 0
-        ganador = row['ganador_id']
+        with open(data_file, "r", encoding="utf-8") as f:
+            store = _json.load(f)
+    except Exception:
+        st.warning("No se pudo leer data.json")
+        return False
 
-        # Restar puntos de liga y partidos jugados
-        cur.execute("UPDATE equipos SET puntos_total = puntos_total - ?, partidos_jugados = partidos_jugados - 1 WHERE id = ?", (match_pts_e1, equipo1_id))
-        cur.execute("UPDATE equipos SET puntos_total = puntos_total - ?, partidos_jugados = partidos_jugados - 1 WHERE id = ?", (match_pts_e2, equipo2_id))
+    partidos = store.get('partidos', [])
+    partida = next((p for p in partidos if p.get('id') == partido_id), None)
+    if not partida:
+        st.error("Partido no encontrado")
+        return False
 
-        # Ajustar ganados/perdidos si corresponde
-        if ganador is not None:
-            cur.execute("UPDATE equipos SET partidos_ganados = partidos_ganados - 1 WHERE id = ?", (ganador,))
-            loser = equipo2_id if ganador == equipo1_id else equipo1_id
-            cur.execute("UPDATE equipos SET partidos_perdidos = partidos_perdidos - 1 WHERE id = ?", (loser,))
+    store['partidos'] = [p for p in partidos if p.get('id') != partido_id]
 
-        # Finalmente borrar el partido
-        cur.execute("DELETE FROM partidos WHERE id = ?", (partido_id,))
-        conn.commit()
+    # recalcular estadísticas
+    try:
+        for e in store.get('equipos', []):
+            e['puntos_total'] = 0
+            e['partidos_jugados'] = 0
+            e['partidos_ganados'] = 0
+            e['partidos_perdidos'] = 0
+        equipos_map = {e['id']: e for e in store.get('equipos', [])}
+        for p in store.get('partidos', []):
+            e1 = equipos_map.get(p.get('equipo1_id'))
+            e2 = equipos_map.get(p.get('equipo2_id'))
+            if not e1 or not e2:
+                continue
+            e1['partidos_jugados'] = e1.get('partidos_jugados', 0) + 1
+            e2['partidos_jugados'] = e2.get('partidos_jugados', 0) + 1
+            # sumar SOLO los bonos por rondas al ganador del partido
+            if p.get('ganador_id') == e1.get('id'):
+                e1['puntos_total'] = e1.get('puntos_total', 0) + (p.get('round_bonus_e1') or 0)
+            if p.get('ganador_id') == e2.get('id'):
+                e2['puntos_total'] = e2.get('puntos_total', 0) + (p.get('round_bonus_e2') or 0)
+            if p.get('ganador_id') is not None:
+                equipos_map[p.get('ganador_id')]['partidos_ganados'] = equipos_map[p.get('ganador_id')].get('partidos_ganados', 0) + 1
+                loser = p.get('equipo2_id') if p.get('ganador_id') == p.get('equipo1_id') else p.get('equipo1_id')
+                equipos_map[loser]['partidos_perdidos'] = equipos_map[loser].get('partidos_perdidos', 0) + 1
+
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(store, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        conn.rollback()
-        st.warning(f"Error eliminando partido: {e}")
+        st.warning(f"Error eliminando partido en JSON: {e}")
         return False
-    finally:
-        conn.close()
 
 
 def clear_database():
     """Elimina todos los partidos y equipos (limpieza total)."""
-    conn = get_conn()
-    cur = conn.cursor()
+    data_file = DATA_DIR / "data.json"
     try:
-        cur.execute("DELETE FROM partidos")
-        cur.execute("DELETE FROM equipos")
-        conn.commit()
+        base = {"equipos": [], "partidos": []}
+        with open(data_file, "w", encoding="utf-8") as f:
+            _json.dump(base, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:
-        conn.rollback()
-        st.warning(f"Error limpiando la base de datos: {e}")
+        st.warning(f"Error limpiando data.json: {e}")
         return False
-    finally:
-        conn.close()
 
 # Header principal
 st.markdown('<div class="main-header">🏆 TORNEO DE DOMINÓ PRO</div>', unsafe_allow_html=True)
@@ -629,24 +734,39 @@ if modo == "⚙️ Panel Organizador":
             if not otros_equipos:
                 st.info("No hay oponentes disponibles que no hayan jugado ya contra este equipo.")
             else:
+                # preparar índices y selectbox PARA equipo2 fuera del form para evitar problemas
+                team_names = [j['nombre'] for j in st.session_state.equipos]
+                try:
+                    e1_idx = team_names.index(equipo1)
+                except ValueError:
+                    e1_idx = 0
+                equipo2 = st.selectbox("Equipo 2", otros_equipos, key=f"ing_e2_{e1_idx}")
+                try:
+                    e2_idx = team_names.index(equipo2)
+                except Exception:
+                    e2_idx = 0
+
                 with st.form("form_resultado", clear_on_submit=True):
-                    equipo2 = st.selectbox("Equipo 2", otros_equipos, key="ing_e2")
                     st.markdown("**Ingresa los puntos por ronda (una ronda finaliza cuando un equipo tiene exactamente 100 pts).**")
 
-                    # Rondas 1 y 2 siempre visibles
+                    # Selección explícita de cuántas rondas se jugaron (2 o 3).
+                    # Si tras las dos primeras rondas ya hay un ganador, forzamos 2.
+                    # Por defecto proponemos 3 rondas.
+                    # Calcular provisionalmente sets tras 2 rondas para forzar opción
                     c1, c2 = st.columns(2)
                     with c1:
-                        r1_p1 = st.number_input(f"Ronda 1 - Puntos {equipo1}", min_value=0, max_value=500, value=0, key=f"ing_r1_e1_{equipo1}_{equipo2}")
+                        r1_p1 = st.number_input(f"Ronda 1 - Puntos {equipo1}", min_value=0, max_value=500, value=0, key=f"ing_r1_e1_{e1_idx}_{e2_idx}")
                     with c2:
-                        r1_p2 = st.number_input(f"Ronda 1 - Puntos {equipo2}", min_value=0, max_value=500, value=0, key=f"ing_r1_e2_{equipo1}_{equipo2}")
+                        r1_p2 = st.number_input(f"Ronda 1 - Puntos {equipo2}", min_value=0, max_value=500, value=0, key=f"ing_r1_e2_{e1_idx}_{e2_idx}")
 
                     c3, c4 = st.columns(2)
                     with c3:
-                        r2_p1 = st.number_input(f"Ronda 2 - Puntos {equipo1}", min_value=0, max_value=500, value=0, key=f"ing_r2_e1_{equipo1}_{equipo2}")
+                        r2_p1 = st.number_input(f"Ronda 2 - Puntos {equipo1}", min_value=0, max_value=500, value=0, key=f"ing_r2_e1_{e1_idx}_{e2_idx}")
                     with c4:
-                        r2_p2 = st.number_input(f"Ronda 2 - Puntos {equipo2}", min_value=0, max_value=500, value=0, key=f"ing_r2_e2_{equipo1}_{equipo2}")
+                        r2_p2 = st.number_input(f"Ronda 2 - Puntos {equipo2}", min_value=0, max_value=500, value=0, key=f"ing_r2_e2_{e1_idx}_{e2_idx}")
 
-                    # calcular sets ganados tras 2 rondas con la regla ==100
+                    # calcular sets ganados tras 2 rondas con la regla ==100 para determinar si
+                    # la tercera ronda fue necesaria
                     sets_e1 = 0
                     sets_e2 = 0
                     # Ronda 1
@@ -670,16 +790,30 @@ if modo == "⚙️ Panel Organizador":
                         elif r2_p2 > r2_p1:
                             sets_e2 += 1
 
+                    # decidir número de rondas jugadas:
+                    # - si ya hay ganador tras 2 rondas, forzamos 2 (no se juega R3)
+                    # - si quedó 1-1 (cada uno ganó una), forzamos 3 (R3 obligatoria)
+                    # - en cualquier otro caso, permitimos elegir 2/3 (por defecto 3)
+                    ganador_tras_2 = (sets_e1 >= 2 or sets_e2 >= 2)
+                    empate_tras_2 = (sets_e1 == 1 and sets_e2 == 1)
+                    if ganador_tras_2:
+                        rondas_jugadas = 2
+                        st.info("Partida cerrada en 2 rondas; tercera ronda no necesaria.")
+                    elif empate_tras_2:
+                        rondas_jugadas = 3
+                        st.info("Empate 1-1 tras 2 rondas — Ronda 3 obligatoria para desempatar.")
+                    else:
+                        rondas_jugadas = st.selectbox("Rondas jugadas:", [2, 3], index=1)
+
                     rounds_list = [{'puntos_e1': int(r1_p1), 'puntos_e2': int(r1_p2)}, {'puntos_e1': int(r2_p1), 'puntos_e2': int(r2_p2)}]
 
-                    # Mostrar/ocultar Ronda 3: si alguno ya tiene 2 sets, no mostrar
-                    show_r3 = not (sets_e1 >= 2 or sets_e2 >= 2)
-                    if show_r3:
+                    # Mostrar Ronda 3 solo si el usuario indicó 3 rondas y no hubo ganador ya
+                    if rondas_jugadas == 3 and not ganador_tras_2:
                         c5, c6 = st.columns(2)
                         with c5:
-                            r3_p1 = st.number_input(f"Ronda 3 - Puntos {equipo1}", min_value=0, max_value=500, value=0, key=f"ing_r3_e1_{equipo1}_{equipo2}")
+                            r3_p1 = st.number_input(f"Ronda 3 - Puntos {equipo1}", min_value=0, max_value=500, value=0, key=f"ing_r3_e1_{e1_idx}_{e2_idx}")
                         with c6:
-                            r3_p2 = st.number_input(f"Ronda 3 - Puntos {equipo2}", min_value=0, max_value=500, value=0, key=f"ing_r3_e2_{equipo1}_{equipo2}")
+                            r3_p2 = st.number_input(f"Ronda 3 - Puntos {equipo2}", min_value=0, max_value=500, value=0, key=f"ing_r3_e2_{e1_idx}_{e2_idx}")
                         rounds_list.append({'puntos_e1': int(r3_p1), 'puntos_e2': int(r3_p2)})
 
                     submitted = st.form_submit_button("🎯 Guardar Resultado del Partido", use_container_width=True)
@@ -714,7 +848,7 @@ if modo == "⚙️ Panel Organizador":
             st.dataframe(df, use_container_width=True)
         
         with col2:
-            with st.form("nuevo_equipo"):
+            with st.form("nuevo_equipo", clear_on_submit=True):
                 nombre_equipo = st.text_input("Nombre del equipo (opcional)")
                 jugador_a = st.text_input("Jugador A (nombre)")
                 jugador_b = st.text_input("Jugador B (nombre)")
@@ -733,6 +867,31 @@ if modo == "⚙️ Panel Organizador":
                             st.rerun()
                         else:
                             st.error(f"❌ No se pudo agregar. El nombre de equipo '{nombre_equipo}' ya existe o hubo un error.")
+            # Formulario para renombrar equipo
+            st.markdown("---")
+            st.markdown("**Renombrar Equipo**")
+            with st.form("renombrar_equipo", clear_on_submit=True):
+                if st.session_state.equipos:
+                    opciones_equipos = {e['nombre']: e['id'] for e in st.session_state.equipos}
+                    sel_nombre = st.selectbox("Selecciona equipo:", list(opciones_equipos.keys()), key="sel_rename_team")
+                    nuevo_nombre = st.text_input("Nuevo nombre del equipo", key="new_team_name")
+                    if st.form_submit_button("🔁 Renombrar equipo"):
+                        if not nuevo_nombre:
+                            st.error("❌ Escribe un nuevo nombre")
+                        else:
+                            equipo_id = opciones_equipos.get(sel_nombre)
+                            ok = rename_team_db(equipo_id, nuevo_nombre)
+                            if ok:
+                                equipos, partidos = load_data()
+                                st.session_state.equipos = equipos or []
+                                st.session_state.partidos = partidos or []
+                                calcular_estadisticas()
+                                st.success(f"✅ Equipo '{sel_nombre}' renombrado a '{nuevo_nombre}'")
+                                st.rerun()
+                            else:
+                                st.error("❌ No se pudo renombrar el equipo")
+                else:
+                    st.info("No hay equipos para renombrar")
             
             # (Control de Ronda eliminado por solicitud)
         # Editor de partidos (corrección)
