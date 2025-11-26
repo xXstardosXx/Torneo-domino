@@ -5,20 +5,20 @@
       "nombre": "David - Juan",
       "jugador1": "David",
       "jugador2": "Juan",
-      "puntos_total": 5,
-      "partidos_jugados": 5,
-      "partidos_ganados": 2,
-      "partidos_perdidos": 3
+      "puntos_total": 9,
+      "partidos_jugados": 7,
+      "partidos_ganados": 3,
+      "partidos_perdidos": 4
     },
     {
       "id": 2,
       "nombre": "Ariadna - Agustina",
       "jugador1": "Agustina",
       "jugador2": "Ari",
-      "puntos_total": 15,
-      "partidos_jugados": 8,
-      "partidos_ganados": 5,
-      "partidos_perdidos": 3
+      "puntos_total": 19,
+      "partidos_jugados": 10,
+      "partidos_ganados": 6,
+      "partidos_perdidos": 4
     },
     {
       "id": 3,
@@ -26,18 +26,18 @@
       "jugador1": "Sheriff",
       "jugador2": "Jose",
       "puntos_total": 22,
-      "partidos_jugados": 12,
+      "partidos_jugados": 13,
       "partidos_ganados": 6,
-      "partidos_perdidos": 6
+      "partidos_perdidos": 7
     },
     {
       "id": 4,
       "nombre": "Carlos - Damaryd",
       "jugador1": "Carlos",
       "jugador2": "Damaryd",
-      "puntos_total": 23,
-      "partidos_jugados": 11,
-      "partidos_ganados": 7,
+      "puntos_total": 27,
+      "partidos_jugados": 12,
+      "partidos_ganados": 8,
       "partidos_perdidos": 4
     },
     {
@@ -46,9 +46,9 @@
       "jugador1": "Regino",
       "jugador2": "Ignacio",
       "puntos_total": 3,
-      "partidos_jugados": 3,
+      "partidos_jugados": 4,
       "partidos_ganados": 1,
-      "partidos_perdidos": 2
+      "partidos_perdidos": 3
     },
     {
       "id": 6,
@@ -75,9 +75,9 @@
       "nombre": "Aybersson - Angelerick",
       "jugador1": "Aybersson",
       "jugador2": "Angelerick",
-      "puntos_total": 18,
-      "partidos_jugados": 8,
-      "partidos_ganados": 5,
+      "puntos_total": 22,
+      "partidos_jugados": 9,
+      "partidos_ganados": 6,
       "partidos_perdidos": 3
     },
     {
@@ -96,9 +96,9 @@
       "jugador1": "Mario",
       "jugador2": "Erick",
       "puntos_total": 12,
-      "partidos_jugados": 4,
+      "partidos_jugados": 5,
       "partidos_ganados": 3,
-      "partidos_perdidos": 1
+      "partidos_perdidos": 2
     },
     {
       "id": 11,
@@ -135,9 +135,9 @@
       "nombre": "Javier - Alan",
       "jugador1": "Javier",
       "jugador2": "Alan",
-      "puntos_total": 11,
-      "partidos_jugados": 6,
-      "partidos_ganados": 3,
+      "puntos_total": 15,
+      "partidos_jugados": 7,
+      "partidos_ganados": 4,
       "partidos_perdidos": 3
     },
     {
@@ -811,6 +811,81 @@
       "round_bonus_e1": 0,
       "round_bonus_e2": 4,
       "fecha": "2025-11-25 20:59"
+    },
+    {
+      "id": 45,
+      "ronda": 1,
+      "equipo1_id": 14,
+      "equipo2_id": 2,
+      "puntos_e1": 200,
+      "puntos_e2": 20,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 14}, {\"puntos_e1\": 100, \"puntos_e2\": 20, \"winner_id\": 14}]",
+      "ganador_id": 14,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 4,
+      "round_bonus_e2": 0,
+      "fecha": "2025-11-26 16:04"
+    },
+    {
+      "id": 46,
+      "ronda": 1,
+      "equipo1_id": 10,
+      "equipo2_id": 2,
+      "puntos_e1": 173,
+      "puntos_e2": 200,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 10}, {\"puntos_e1\": 34, \"puntos_e2\": 100, \"winner_id\": 2}, {\"puntos_e1\": 39, \"puntos_e2\": 100, \"winner_id\": 2}]",
+      "ganador_id": 2,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 2,
+      "round_bonus_e2": 4,
+      "fecha": "2025-11-26 16:04"
+    },
+    {
+      "id": 47,
+      "ronda": 1,
+      "equipo1_id": 1,
+      "equipo2_id": 3,
+      "puntos_e1": 200,
+      "puntos_e2": 65,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 1}, {\"puntos_e1\": 100, \"puntos_e2\": 65, \"winner_id\": 1}]",
+      "ganador_id": 1,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 4,
+      "round_bonus_e2": 0,
+      "fecha": "2025-11-26 16:04"
+    },
+    {
+      "id": 48,
+      "ronda": 1,
+      "equipo1_id": 1,
+      "equipo2_id": 8,
+      "puntos_e1": 25,
+      "puntos_e2": 200,
+      "rounds_json": "[{\"puntos_e1\": 25, \"puntos_e2\": 100, \"winner_id\": 8}, {\"puntos_e1\": 0, \"puntos_e2\": 100, \"winner_id\": 8}]",
+      "ganador_id": 8,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 0,
+      "round_bonus_e2": 4,
+      "fecha": "2025-11-26 16:05"
+    },
+    {
+      "id": 49,
+      "ronda": 1,
+      "equipo1_id": 4,
+      "equipo2_id": 5,
+      "puntos_e1": 245,
+      "puntos_e2": 124,
+      "rounds_json": "[{\"puntos_e1\": 45, \"puntos_e2\": 100, \"winner_id\": 5}, {\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 4}, {\"puntos_e1\": 100, \"puntos_e2\": 24, \"winner_id\": 4}]",
+      "ganador_id": 4,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 4,
+      "round_bonus_e2": 2,
+      "fecha": "2025-11-26 16:05"
     }
   ]
 }
