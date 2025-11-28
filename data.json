@@ -55,9 +55,9 @@
       "nombre": "Enmanuel - Daniel",
       "jugador1": "Enmanuel",
       "jugador2": "Daniel",
-      "puntos_total": 14,
-      "partidos_jugados": 6,
-      "partidos_ganados": 4,
+      "puntos_total": 17,
+      "partidos_jugados": 7,
+      "partidos_ganados": 5,
       "partidos_perdidos": 2
     },
     {
@@ -76,9 +76,9 @@
       "jugador1": "Aybersson",
       "jugador2": "Angelerick",
       "puntos_total": 22,
-      "partidos_jugados": 9,
+      "partidos_jugados": 10,
       "partidos_ganados": 6,
-      "partidos_perdidos": 3
+      "partidos_perdidos": 4
     },
     {
       "id": 9,
@@ -961,6 +961,21 @@
       "round_bonus_e1": 2,
       "round_bonus_e2": 4,
       "fecha": "2025-11-28 00:01"
+    },
+    {
+      "id": 55,
+      "ronda": 1,
+      "equipo1_id": 6,
+      "equipo2_id": 8,
+      "puntos_e1": 225,
+      "puntos_e2": 172,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 6}, {\"puntos_e1\": 25, \"puntos_e2\": 100, \"winner_id\": 8}, {\"puntos_e1\": 100, \"puntos_e2\": 72, \"winner_id\": 6}]",
+      "ganador_id": 6,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 3,
+      "round_bonus_e2": 2,
+      "fecha": "2025-11-28 00:23"
     }
   ]
 }
