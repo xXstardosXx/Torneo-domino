@@ -55,9 +55,9 @@
       "nombre": "Enmanuel - Daniel",
       "jugador1": "Enmanuel",
       "jugador2": "Daniel",
-      "puntos_total": 10,
-      "partidos_jugados": 5,
-      "partidos_ganados": 3,
+      "puntos_total": 14,
+      "partidos_jugados": 6,
+      "partidos_ganados": 4,
       "partidos_perdidos": 2
     },
     {
@@ -86,9 +86,9 @@
       "jugador1": "Jorgelis",
       "jugador2": "Diego",
       "puntos_total": 7,
-      "partidos_jugados": 9,
+      "partidos_jugados": 10,
       "partidos_ganados": 2,
-      "partidos_perdidos": 7
+      "partidos_perdidos": 8
     },
     {
       "id": 10,
@@ -105,20 +105,20 @@
       "nombre": "Sarai - Angelina",
       "jugador1": "Sarai",
       "jugador2": "Angelina",
-      "puntos_total": 15,
-      "partidos_jugados": 6,
-      "partidos_ganados": 4,
-      "partidos_perdidos": 2
+      "puntos_total": 18,
+      "partidos_jugados": 8,
+      "partidos_ganados": 5,
+      "partidos_perdidos": 3
     },
     {
       "id": 12,
       "nombre": "Isaac - Manuel",
       "jugador1": "Isaac",
       "jugador2": "Manuel",
-      "puntos_total": 10,
-      "partidos_jugados": 5,
-      "partidos_ganados": 3,
-      "partidos_perdidos": 2
+      "puntos_total": 18,
+      "partidos_jugados": 8,
+      "partidos_ganados": 5,
+      "partidos_perdidos": 3
     },
     {
       "id": 13,
@@ -135,10 +135,10 @@
       "nombre": "Javier - Alan",
       "jugador1": "Javier",
       "jugador2": "Alan",
-      "puntos_total": 15,
-      "partidos_jugados": 7,
-      "partidos_ganados": 4,
-      "partidos_perdidos": 3
+      "puntos_total": 19,
+      "partidos_jugados": 10,
+      "partidos_ganados": 5,
+      "partidos_perdidos": 5
     },
     {
       "id": 15,
@@ -886,6 +886,81 @@
       "round_bonus_e1": 4,
       "round_bonus_e2": 2,
       "fecha": "2025-11-26 16:05"
+    },
+    {
+      "id": 50,
+      "ronda": 1,
+      "equipo1_id": 11,
+      "equipo2_id": 14,
+      "puntos_e1": 219,
+      "puntos_e2": 231,
+      "rounds_json": "[{\"puntos_e1\": 19, \"puntos_e2\": 100, \"winner_id\": 14}, {\"puntos_e1\": 100, \"puntos_e2\": 89, \"winner_id\": 11}, {\"puntos_e1\": 100, \"puntos_e2\": 42, \"winner_id\": 11}]",
+      "ganador_id": 11,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 3,
+      "round_bonus_e2": 2,
+      "fecha": "2025-11-28 00:00"
+    },
+    {
+      "id": 51,
+      "ronda": 1,
+      "equipo1_id": 12,
+      "equipo2_id": 14,
+      "puntos_e1": 284,
+      "puntos_e2": 127,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 27, \"winner_id\": 12}, {\"puntos_e1\": 84, \"puntos_e2\": 100, \"winner_id\": 14}, {\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 12}]",
+      "ganador_id": 12,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 4,
+      "round_bonus_e2": 1,
+      "fecha": "2025-11-28 00:00"
+    },
+    {
+      "id": 52,
+      "ronda": 1,
+      "equipo1_id": 11,
+      "equipo2_id": 12,
+      "puntos_e1": 147,
+      "puntos_e2": 264,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 64, \"winner_id\": 11}, {\"puntos_e1\": 47, \"puntos_e2\": 100, \"winner_id\": 12}, {\"puntos_e1\": 0, \"puntos_e2\": 100, \"winner_id\": 12}]",
+      "ganador_id": 12,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 2,
+      "round_bonus_e2": 4,
+      "fecha": "2025-11-28 00:01"
+    },
+    {
+      "id": 53,
+      "ronda": 1,
+      "equipo1_id": 12,
+      "equipo2_id": 6,
+      "puntos_e1": 98,
+      "puntos_e2": 200,
+      "rounds_json": "[{\"puntos_e1\": 34, \"puntos_e2\": 100, \"winner_id\": 6}, {\"puntos_e1\": 64, \"puntos_e2\": 100, \"winner_id\": 6}]",
+      "ganador_id": 6,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 0,
+      "round_bonus_e2": 4,
+      "fecha": "2025-11-28 00:01"
+    },
+    {
+      "id": 54,
+      "ronda": 1,
+      "equipo1_id": 9,
+      "equipo2_id": 14,
+      "puntos_e1": 146,
+      "puntos_e2": 262,
+      "rounds_json": "[{\"puntos_e1\": 100, \"puntos_e2\": 62, \"winner_id\": 9}, {\"puntos_e1\": 46, \"puntos_e2\": 100, \"winner_id\": 14}, {\"puntos_e1\": 0, \"puntos_e2\": 100, \"winner_id\": 14}]",
+      "ganador_id": 14,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 2,
+      "round_bonus_e2": 4,
+      "fecha": "2025-11-28 00:01"
     }
   ]
 }
