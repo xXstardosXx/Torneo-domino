@@ -15,9 +15,9 @@
       "nombre": "Ariadna - Agustina",
       "jugador1": "Agustina",
       "jugador2": "Ari",
-      "puntos_total": 19,
-      "partidos_jugados": 10,
-      "partidos_ganados": 6,
+      "puntos_total": 23,
+      "partidos_jugados": 11,
+      "partidos_ganados": 7,
       "partidos_perdidos": 4
     },
     {
@@ -56,9 +56,9 @@
       "jugador1": "Enmanuel",
       "jugador2": "Daniel",
       "puntos_total": 17,
-      "partidos_jugados": 7,
+      "partidos_jugados": 8,
       "partidos_ganados": 5,
-      "partidos_perdidos": 2
+      "partidos_perdidos": 3
     },
     {
       "id": 7,
@@ -976,6 +976,21 @@
       "round_bonus_e1": 3,
       "round_bonus_e2": 2,
       "fecha": "2025-11-28 00:23"
+    },
+    {
+      "id": 56,
+      "ronda": 1,
+      "equipo1_id": 2,
+      "equipo2_id": 6,
+      "puntos_e1": 217,
+      "puntos_e2": 164,
+      "rounds_json": "[{\"puntos_e1\": 17, \"puntos_e2\": 100, \"winner_id\": 6}, {\"puntos_e1\": 100, \"puntos_e2\": 64, \"winner_id\": 2}, {\"puntos_e1\": 100, \"puntos_e2\": 0, \"winner_id\": 2}]",
+      "ganador_id": 2,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 4,
+      "round_bonus_e2": 2,
+      "fecha": "2025-11-28 00:28"
     }
   ]
 }
