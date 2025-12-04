@@ -16,9 +16,9 @@
       "jugador1": "Agustina",
       "jugador2": "Ari",
       "puntos_total": 23,
-      "partidos_jugados": 11,
+      "partidos_jugados": 12,
       "partidos_ganados": 7,
-      "partidos_perdidos": 4
+      "partidos_perdidos": 5
     },
     {
       "id": 3,
@@ -45,9 +45,9 @@
       "nombre": "Regino - Ignacio",
       "jugador1": "Regino",
       "jugador2": "Ignacio",
-      "puntos_total": 10,
-      "partidos_jugados": 7,
-      "partidos_ganados": 3,
+      "puntos_total": 14,
+      "partidos_jugados": 8,
+      "partidos_ganados": 4,
       "partidos_perdidos": 4
     },
     {
@@ -1096,6 +1096,21 @@
       "round_bonus_e1": 4,
       "round_bonus_e2": 2,
       "fecha": "2025-12-03 14:25"
+    },
+    {
+      "id": 64,
+      "ronda": 1,
+      "equipo1_id": 2,
+      "equipo2_id": 5,
+      "puntos_e1": 23,
+      "puntos_e2": 200,
+      "rounds_json": "[{\"puntos_e1\": 19, \"puntos_e2\": 100, \"winner_id\": 5}, {\"puntos_e1\": 4, \"puntos_e2\": 100, \"winner_id\": 5}]",
+      "ganador_id": 5,
+      "match_pts_e1": 0,
+      "match_pts_e2": 0,
+      "round_bonus_e1": 0,
+      "round_bonus_e2": 4,
+      "fecha": "2025-12-04 16:59"
     }
   ]
 }
